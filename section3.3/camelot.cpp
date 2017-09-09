@@ -123,10 +123,6 @@ int main () {
         knights_steps[index] = compute(nx[index], ny[index], i, j);
         sum += knights_steps[index];
       }
-            if (sum < min_sum) {
-              cout << i << " "<<j << endl;
-              cout << sum << "@"<<endl;
-            }
       min_sum = min(sum, min_sum);
 
       int range = 2;
