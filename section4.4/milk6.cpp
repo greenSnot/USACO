@@ -28,11 +28,11 @@ ifstream  fin("milk6.in", ios::in);
 
 long long C, T;
 long long g[MAX_N][MAX_N], m[MAX_N][MAX_N], G[MAX_N][MAX_N], inc[MAX_T];
-vector<long long > connect[MAX_N];
+vector<long long > neighbour[MAX_N];
 bool visited[MAX_T];
 int q[MAX_T];
 int pre[MAX_T];
-long long INF = (long long)(1047483647) * 2147483647;
+long long INF = 1e17;
 
 bool search(int a, int dest) {
   int cur = 0;
@@ -46,14 +46,16 @@ bool search(int a, int dest) {
   {
     int i = q[cur];
     ++cur;
-    for (int j = 0; j < C; j++)
+    for (int k = 0, j; k < neighbour[i].size(); k++)
     {
+      j = neighbour[i][k];
       if (pre[j] == -1 && G[i][j] > g[i][j])
       {
         pre[j] = i;
         inc[j] = min(inc[i], G[i][j] - g[i][j]);
-        if (j == dest)
+        if (j == dest) {
           return true;
+        }
         q[q_len] = j;
         ++q_len;
       }
@@ -77,9 +79,10 @@ long long max_flow() {
 
 void fill(long long a, int chance = 0) {
   visited[a] = true;
-  for (int i = 0; i < C; ++i) {
-    if (!visited[i] && G[a][i] > g[a][i]) {
-      fill(i);
+  for (int i = 0; i < neighbour[a].size(); ++i) {
+    int j = neighbour[a][i];
+    if (!visited[j] && G[a][j] > g[a][j]) {
+      fill(j);
     }
   }
 }
@@ -100,8 +103,8 @@ int main()
     }
     m[a][b] = 1;
     m[b][a] = 1;
-    connect[a].push_back(b);
-    connect[b].push_back(a);
+    neighbour[a].push_back(b);
+    neighbour[b].push_back(a);
   }
   long long m_flow = max_flow();
   int set_size = m_flow % (long long)(MAX_T * 500000) / 500000;
