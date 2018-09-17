@@ -8,7 +8,6 @@ TASK: window
 #include <algorithm>
 #include <iostream>
 #include <fstream>
-#include <queue>
 #include <string>
 #include <string.h>
 #include <map>
@@ -20,38 +19,18 @@ TASK: window
 #include <sstream>
 #include <math.h>
 using namespace std;
-#define MAX 101
 
 ofstream fout("window.out", ios::out);
 ifstream  fin("window.in", ios::in);
 
-/*
-Create a window
-Bring a window to the top
-Put a window to the bottom
-Destroy a window
-Output what percentage of a window is visible (i.e., isn't covered by windows above it).
-In the input, the operations appear in the following format:
-
-Create window: w(I,x,y,X,Y)
-Bring window to top: t(I)
-Put window on bottom: b(I)
-Destroy window: d(I)
-Output percentage visible: s(I)
-*/
-
-map<char, vector<int> > data;
+map<char, int* > data;
 int maxLevel = 0;
 
 bool isNum(char a) {
   return a >= '0' && a <= '9';
 }
 
-bool inRect(int x, int y, int rx, int ry, int w, int h) {
-  return x >= rx && x <= rx + w && y >= ry && y <= ry + h;
-}
-
-bool bump(vector<int> a, vector<int> b) {
+bool bump(int* a, int* b) {
   int w1 = a[2];
   int h1 = a[3];
   int w2 = b[2];
@@ -60,14 +39,10 @@ bool bump(vector<int> a, vector<int> b) {
   int aminy = a[1];
   int bminx = b[0];
   int bminy = b[1];
-  return aminx + w1 >= bminx &&
-    aminx <= bminx + w2 &&
-    aminy <= bminy + h2 &&
-    aminy + h1 >= bminy;
-}
-
-bool collide(char a, char b) {
-  return bump(data[a], data[b]);
+  return aminx + w1 - 1 >= bminx &&
+    aminx <= bminx + w2 - 1 &&
+    aminy <= bminy + h2 - 1 &&
+    aminy + h1 - 1 >= bminy;
 }
 
 void addWindow(char id, int x1, int y1, int x2, int y2) {
@@ -76,26 +51,32 @@ void addWindow(char id, int x1, int y1, int x2, int y2) {
   int minx = min(x1, x2);
   int miny = min(y1, y2);
 
-  int myints[] = {minx, miny, w, h, maxLevel};
-  vector<int> v (myints, myints + sizeof(myints) / sizeof(int) );
-  data[id] = v;
+  int (*i) = new int[5];
+  i[0] = minx;
+  i[1] = miny;
+  i[2] = w;
+  i[3] = h;
+  i[4] = maxLevel;
+  data[id] = i;
   maxLevel++;
 }
 
 void destroy(char id) {
-  map<char, vector<int> >::iterator it = data.find(id);
+  map<char, int* >::iterator it = data.find(id);
   int level = (it -> second)[4];
-  for (map<char, vector<int> >::iterator it = data.begin(); it != data.end(); ++it) {
+  for (map<char, int* >::iterator it = data.begin(); it != data.end(); ++it) {
     if ((it -> second)[4] > level) {
       (it -> second)[4]--;
     }
   }
+  delete[] it-> second;
+  data.erase(it);
 }
 
 void bringTop(char id) {
-  map<char, vector<int> >::iterator it = data.find(id);
+  map<char, int* >::iterator it = data.find(id);
   int level = (it -> second)[4];
-  for (map<char, vector<int> >::iterator it = data.begin(); it != data.end(); ++it) {
+  for (map<char, int* >::iterator it = data.begin(); it != data.end(); ++it) {
     if ((it -> second)[4] > level) {
       (it -> second)[4]--;
     }
@@ -104,9 +85,9 @@ void bringTop(char id) {
 }
 
 void putBottom(char id) {
-  map<char, vector<int> >::iterator it = data.find(id);
+  map<char, int* >::iterator it = data.find(id);
   int level = (it -> second)[4];
-  for (map<char, vector<int> >::iterator it = data.begin(); it != data.end(); ++it) {
+  for (map<char, int* >::iterator it = data.begin(); it != data.end(); ++it) {
     if ((it -> second)[4] < level) {
       (it -> second)[4]++;
     }
@@ -114,68 +95,78 @@ void putBottom(char id) {
   (it -> second)[4] = 0;
 }
 
+float s_area;
+vector<char> candidates;
+char last;
+void merge(int idx, int bminx, int bminy, int w2, int h2) {
+  // cout << "b:" << bminx << " " << bminy << " " << w2 << " " << h2 << endl;
+  if (w2 <= 0 || h2 <= 0) return;
+  if (idx == candidates.size()) {
+     // cout << "#";
+    s_area += h2 * w2;
+    return;
+  }
+  last = candidates[idx];
+  int* d = data[candidates[idx]];
+  int w1 = d[2];
+  int h1 = d[3];
+  int aminx = d[0];
+  int aminy = d[1];
+  int amaxx = aminx + w1;
+  int amaxy = aminy + h1;
+   // cout << "a:" << aminx << " " << aminy << " " << w1 << " " << h1 << endl;
+  int bmaxx = bminx + w2;
+  int bmaxy = bminy + h2;
+  if (amaxx - 1 >= bminx &&
+    aminx <= bmaxx - 1 &&
+    aminy <= bmaxy - 1 &&
+    amaxy - 1 >= bminy) {
+     // cout << "right" << endl;
+    merge(idx + 1, amaxx, max(aminy, bminy), bmaxx - amaxx, min(amaxy, bmaxy) - max(aminy, bminy));
+     // cout << "right end" << endl;
+     // cout << "left" << endl;
+    merge(idx + 1, bminx, max(aminy, bminy), aminx - bminx, min(amaxy, bmaxy) - max(aminy, bminy));
+     // cout << "left end" << endl;
+     // cout << "bottom" << endl;
+    merge(idx + 1, bminx, bminy, w2, aminy - bminy);
+     // cout << "left end" << endl;
+     // cout << "top" << endl;
+    merge(idx + 1, bminx, amaxy, w2, bmaxy - amaxy);
+     // cout << "top end" << endl;
+  } else {
+    merge(idx + 1, bminx, bminy, w2, h2);
+  }
+}
+
+float lastOutputValue;
 void outputPercentage(char id) {
-  vector<vector<int> > rest;
-  rest.push_back(data[id]);
   int level = data[id][4];
   int area = data[id][2] * data[id][3];
-  for (map<char, vector<int> >::iterator it = data.begin(); it != data.end(); ++it) {
-    if ((it -> second)[4] > level && collide(it -> first, id)) {
 
-      int len = rest.size();
-      for (int i = 0; i < len; ++i) {
-        vector<int> a = rest[i];
-        vector<int> b = it -> second;
-        if (bump(a, b)) {
-          rest.erase(rest.begin() + i);
-          len--;
-          i--;
-          int topOffset = a[1] + a[3] - b[1] - b[3];
-          int bottomOffset = b[1] - a[1];
-          int leftOffset = b[0] - a[0];
-          int rightOffset = a[0] + a[2] - b[0] - b[2];
-          // cout << topOffset << " " << bottomOffset << " " << leftOffset << " " << rightOffset << endl;
-          if (topOffset > 0) {
-            int j[] = {a[0], b[1] + b[3], a[2], topOffset};
-            vector<int> v (j, j + sizeof(j) / sizeof(int) );
-            rest.push_back(v);
-          }
-          if (bottomOffset > 0) {
-            int j[] = {a[0], a[1], a[2], bottomOffset};
-            vector<int> v (j, j + sizeof(j) / sizeof(int) );
-            rest.push_back(v);
-          }
-          if (leftOffset > 0) {
-            int j[] = {a[0] + leftOffset, max(b[1], a[1]), leftOffset, min(a[1] + a[3], b[1] + b[3])};
-            vector<int> v (j, j + sizeof(j) / sizeof(int) );
-            rest.push_back(v);
-          }
-          if (rightOffset > 0) {
-            int j[] = {a[0] + a[2] - rightOffset, max(b[1], a[1]), rightOffset, min(a[1] + a[3], b[1] + b[3])};
-            vector<int> v (j, j + sizeof(j) / sizeof(int) );
-            rest.push_back(v);
-          }
-        }
-      }
+  s_area = 0;
+  candidates.clear();
+  for (map<char, int*>::iterator it = data.begin(); it != data.end(); ++it) {
+    if ((it -> second)[4] > level && bump(data[id], it -> second)) {
+      candidates.push_back(it -> first);
     }
   }
-  int a = 0;
-  for (int i = 0; i < rest.size(); ++i) {
-    // cout << rest[i][0] << " " << rest[i][1] << " " << rest[i][2] << " " << rest[i][3] << endl;
-    a += rest[i][2] * rest[i][3];
-  }
 
-  cout << std::fixed;
-  cout << std::setprecision(3);
-  cout << float(a) / float(area) * 100 << endl;
-  fout << std::fixed;
-  fout << std::setprecision(3);
-  fout << float(a) / float(area) * 100 << endl;
+  merge(0, data[id][0], data[id][1], data[id][2], data[id][3]);
+
+  float ans = (float(s_area) / float(area)) * 100;
+  fout << ans << endl;
+  cout << ans << endl;
+  lastOutputValue = ans;
 }
 
 int main() {
   string s;
 
+  fout << std::fixed;
+  fout << std::setprecision(3);
+  cout << std::fixed;
+  cout << std::setprecision(3);
+  char lastOutputId = ' ';
   while (fin >> s) {
     char opt = s[0];
     char id = s[2];
@@ -194,14 +185,23 @@ int main() {
         ++idx;
       }
       addWindow(id, n[0], n[1], n[2], n[3]);
+      lastOutputId = ' ';
     } else if (opt == 't') {
+      lastOutputId = ' ';
       bringTop(id);
     } else if (opt == 'b') {
+      lastOutputId = ' ';
       putBottom(id);
     } else if (opt == 'd') {
+      lastOutputId = ' ';
       destroy(id);
     } else if (opt == 's') {
-      outputPercentage(id);
+      if (lastOutputId == id) {
+        fout << lastOutputValue << endl;
+      } else {
+        lastOutputId = id;
+        outputPercentage(id);
+      }
     }
   }
 
